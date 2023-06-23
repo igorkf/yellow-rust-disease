@@ -46,7 +46,7 @@ if __name__ == '__main__':
     # df_test = make_df(PATH, test=True)
     
     acc_folds = np.zeros(N_FOLDS)
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
+    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_SEED)
     for fold, (train, val) in enumerate(skf.split(df.drop('label', axis=1), df['label'])):
         print(f'\n-------- FOLD {fold} --------')
         
