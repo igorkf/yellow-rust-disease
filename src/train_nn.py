@@ -29,7 +29,6 @@ RANDOM_SEED = 42
 BATCH_SIZE = 64
 NUM_WORKERS = 4
 EPOCHS = 100
-SHOW_LR = True
 
 
 if __name__ == '__main__':
@@ -84,7 +83,10 @@ if __name__ == '__main__':
         loss_fn = torch.nn.CrossEntropyLoss()
         # optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)        
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+
+        # https://www.kaggle.com/code/isbhargav/guide-to-pytorch-learning-rate-scheduling
+        # scheduler = lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1, verbose=True)
+        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=10, eta_min=0, verbose=True)
 
         best_acc = 0.0
         for epoch in range(EPOCHS):
@@ -92,8 +94,6 @@ if __name__ == '__main__':
             val_loss, val_acc = validate_one_epoch(model, val_dataloader, loss_fn, device)
 
             print(f'\n[EPOCH] {epoch + 1}/{EPOCHS}')
-            if SHOW_LR:
-                print('[LR]', scheduler.get_last_lr()[0])
             print(f'[TRAIN] Loss: {train_loss:.6f}, Acc: {train_acc:.6f}')
             print(f'[VAL  ] Loss: {val_loss:.6f}, Acc: {val_acc:.6f}')
 
