@@ -1,13 +1,8 @@
 import torch
-from torch import nn
+import torch.nn as nn
+import numpy as np
 
-
-def accuracy(ypred, ytrue):
-    soft = nn.functional.softmax(ypred, dim=1)
-    probs, preds = soft.topk(1, dim=1)
-    tp = (ytrue == preds.ravel()).sum().item()
-    acc = tp / ytrue.size(0)
-    return acc
+from metrics import accuracy, confusion_matrix
 
 
 def train_one_step(model, batch, loss_fn, optimizer, device):
@@ -15,44 +10,60 @@ def train_one_step(model, batch, loss_fn, optimizer, device):
     x = batch[0].to(device).float()
     ytrue = batch[1].to(device)
     ypred = model(x)
-    acc = accuracy(ypred, ytrue)
     loss = loss_fn(ypred, ytrue)
     loss.backward()
     optimizer.step()
-    return loss, acc
+
+    metrics = {}
+    metrics['acc'] = accuracy(ypred, ytrue)
+    metrics['cm'] = confusion_matrix(ypred, ytrue)
+
+    # n_null_imgs = (x.detach().cpu().numpy().reshape(64, -1).sum(axis=1) == 0).sum()
+    # print(f'# Null imgs in train: {n_null_imgs}/{x.shape[0]}')
+
+    return loss, metrics
 
 
 def train_one_epoch(model, data_loader, loss_fn, optimizer, device):
     model.train()
     total_loss = 0
-    total_acc = 0
+    avg_metrics = {'acc': 0, 'cm': np.zeros((3, 3))}
     for idx, batch in enumerate(data_loader):
-        loss, acc = train_one_step(model, batch, loss_fn, optimizer, device)
+        loss, metrics = train_one_step(model, batch, loss_fn, optimizer, device)
         total_loss += loss
-        total_acc += acc
+        for k in metrics:
+            avg_metrics[k] += metrics[k]
     avg_loss = total_loss / (idx + 1)
-    avg_acc = total_acc / (idx + 1)
-    return avg_loss, avg_acc
+    avg_metrics['acc'] = avg_metrics['acc'] / (idx + 1)
+    return avg_loss, avg_metrics
 
 
 def validate_one_step(model, batch, loss_fn, device):
     x = batch[0].to(device).float()
     ytrue = batch[1].to(device)
     ypred = model(x)
-    acc = accuracy(ypred, ytrue)
     loss = loss_fn(ypred, ytrue)
-    return loss, acc
+
+    metrics = {}
+    metrics['acc'] = accuracy(ypred, ytrue)
+    metrics['cm'] = confusion_matrix(ypred, ytrue)
+
+    # n_null_imgs = (x.detach().cpu().numpy().reshape(64, -1).sum(axis=1) == 0).sum()
+    # print(f'# Null imgs in val: {n_null_imgs}/{x.shape[0]}')
+
+    return loss, metrics
 
 
 def validate_one_epoch(model, data_loader, loss_fn, device):
     model.eval()
     total_loss = 0
-    total_acc = 0
+    avg_metrics = {'acc': 0, 'cm': np.zeros((3, 3))}
     with torch.no_grad():
         for idx, batch in enumerate(data_loader):
-            loss, acc = validate_one_step(model, batch, loss_fn, device)
+            loss, metrics = validate_one_step(model, batch, loss_fn, device)
             total_loss += loss
-            total_acc += acc
+            for k in metrics:
+                avg_metrics[k] += metrics[k]
     avg_loss = total_loss / (idx + 1)
-    avg_acc = total_acc / (idx + 1)
-    return avg_loss, avg_acc
+    avg_metrics['acc'] = avg_metrics['acc'] / (idx + 1)
+    return avg_loss, avg_metrics

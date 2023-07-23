@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import skimage
 from tqdm import tqdm
+from scipy.ndimage import uniform_filter
 
 
 def make_df(basedir: str, test: bool):
@@ -30,6 +31,7 @@ def make_df(basedir: str, test: bool):
 
 def feature_extraction(img: np.ndarray, patch_size: list, band: int):
     M, N = patch_size
+    img_band = uniform_filter(img[:, :, band], size=3, mode='reflect')  # running average (filter)
     img_band = np.expand_dims(img[:, :, band], axis=-1)
     patches = [img_band[x:x+M, y:y+N] for x in range(0, img_band.shape[0], M) for y in range(0, img_band.shape[1], N)]
     features = {}

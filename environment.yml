@@ -271,4 +271,12 @@ dependencies:
   - zlib=1.2.13=hd590300_5
   - zlib-ng=2.0.7=h0b41bf4_0
   - zstd=1.5.2=h3eb15da_6
+  - pip:
+      - alembic==1.11.1
+      - cmaes==0.9.1
+      - colorlog==6.7.0
+      - greenlet==2.0.2
+      - mako==1.2.4
+      - optuna==3.2.0
+      - sqlalchemy==2.0.17
 prefix: /home/igorf/.conda/envs/crop-disease

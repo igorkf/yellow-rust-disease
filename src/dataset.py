@@ -1,8 +1,16 @@
 import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
-import skimage
+from skimage.io import imread
 from skimage.util import img_as_float
+
+
+def normalize_between_channels(img):
+    '''
+    Divides by (std + eps) because some images are totally zero even in test
+    '''
+    eps = 1e-3
+    return (img - img.mean()) / (img.std() + eps)
 
 
 class TIFDataset(Dataset):
@@ -15,11 +23,17 @@ class TIFDataset(Dataset):
         return len(self.df)
     
     def __getitem__(self, idx):
-        path = self.df.iloc[idx]['path']
         label = self.df.iloc[idx]['label']
         label = torch.tensor(label)
-        img = img_as_float(skimage.io.imread(path))[:, :, :self.bands]
+
+        path = self.df.iloc[idx]['path']
+        img = img_as_float(imread(path))[:, :, :self.bands]  # some images have 126 bands idk why
+        img = ToTensor()(img)
+        # img = torch.tensor(img)
+        # img = normalize_between_channels(img)
+        # img = img.permute(2, 0, 1)  # [h, w, c] -> [c, h, w]
+
         if self.transform:
-            img = self.transform(image=img)['image']  # from albumentations
-        img = ToTensor()(img)  # from torchvision
+            img = self.transform(img)
+
         return img, label
