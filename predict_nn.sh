@@ -16,5 +16,5 @@ conda deactivate
 conda activate crop-disease
 
 ## run
-python3 -u src/predict_nn.py --dir=20230723-154851_resnet18_bs56_acc0_757143
+python3 -u src/predict_nn.py --dir=20230723-154851_resnet18_bs56_acc0_757143 --ignore=4
 

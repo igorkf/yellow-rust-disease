@@ -19,6 +19,7 @@ from training import train_one_epoch, validate_one_epoch
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--model')
 parser.add_argument('--bs')
 args = parser.parse_args()
 args.bs = int(args.bs)
@@ -34,7 +35,6 @@ RANDOM_SEED = 42
 IMG_SIZE = (64, 64)
 EPOCHS = 100
 
-MODEL = 'resnet18'
 # MODEL = 'convnext_large'
 
 
@@ -69,7 +69,7 @@ class EarlyStopper:
 if __name__ == '__main__':
     
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    OUT = f'output/models/{timestamp}_{MODEL}_bs{args.bs}'
+    OUT = f'output/models/{timestamp}_{args.model}_bs{args.bs}'
     os.mkdir(OUT)
 
     set_seed(RANDOM_SEED)
@@ -98,7 +98,7 @@ if __name__ == '__main__':
         loss_fn = torch.nn.CrossEntropyLoss()
 
         # define model
-        if MODEL == 'hu':
+        if args.model == 'hu':
             transform = transforms.Compose([
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.RandomVerticalFlip(p=0.5),
@@ -107,9 +107,10 @@ if __name__ == '__main__':
             ])
             model = HuEtAl(img_size=IMG_SIZE, input_channels=BANDS, n_classes=len(LABEL2INT))
             optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-            scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0, verbose=True)
+            scheduler = EarlyStopper(patience=int(EPOCHS * 0.20), min_delta=0.01)
+            # scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0, verbose=True)
             # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=20, verbose=True)
-        elif MODEL == 'resnet18':
+        elif args.model == 'resnet18':
             transform = transforms.Compose([
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.RandomVerticalFlip(p=0.5),
@@ -126,7 +127,7 @@ if __name__ == '__main__':
             # scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0, verbose=True)
             scheduler = EarlyStopper(patience=int(EPOCHS * 0.20), min_delta=0.01)
         else:
-            raise Exception(f'Model {MODEL} not implemented')
+            raise Exception(f'Model {args.model} not implemented')
         
         model = model.to(device)
 
@@ -137,10 +138,6 @@ if __name__ == '__main__':
         df_val = df.loc[val]
         val_ds = TIFDataset(df_val, bands=BANDS, transform=None)
         val_dataloader = DataLoader(val_ds, batch_size=args.bs, num_workers=NUM_WORKERS, shuffle=False)
-
-        # https://www.kaggle.com/code/isbhargav/guide-to-pytorch-learning-rate-scheduling
-        # scheduler = lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1, verbose=True)
-        # scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=10, eta_min=0, verbose=True)
 
         best_acc = 0.0
         for epoch in range(EPOCHS):

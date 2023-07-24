@@ -17,7 +17,7 @@ from metrics import accuracy
 
 def extract_best_models(dir):
     files = os.listdir(dir)
-    folds = set(sorted([int(x[4]) for x in files]))
+    folds = set(sorted([int(x[4]) for x in files if 'fold' in x]))
     best_models = []
     for fold in folds:
         files_fold = [x for x in files if f'fold{fold}' in x]
@@ -34,6 +34,7 @@ def extract_best_models(dir):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dir')
+parser.add_argument('--ignore', type=int, nargs='*', default=[])
 args = parser.parse_args()
 
 PATH = 'data'
@@ -77,11 +78,15 @@ if __name__ == '__main__':
     test_dataloader = DataLoader(test_ds, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, shuffle=False) 
 
     test_probs = np.zeros((len(df_test), 3))
-    acc_folds = np.zeros(N_FOLDS)
+    acc_folds = []
     accs = []
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_SEED)
     for fold, (_, val) in enumerate(skf.split(df.drop('label', axis=1), df['label'])):
         print(f'\n-------- FOLD {fold} --------')
+
+        if fold in args.ignore:
+            print('Ignoring fold...')
+            continue
 
         # pick val
         df_val = df.loc[val]
@@ -115,7 +120,7 @@ if __name__ == '__main__':
                 total_acc += acc
         avg_acc = total_acc / (idx + 1)
         print(f'[VAL] Acc: {avg_acc:.6f}')
-        acc_folds[fold] = avg_acc
+        acc_folds.append(avg_acc)
 
         # predict on test
         probs = []
@@ -128,6 +133,7 @@ if __name__ == '__main__':
         probs = np.concatenate(probs)
         test_probs += probs / len(MODELS)  # blend
     
+    acc_folds = np.array(acc_folds)
     print('-' * 30)
     print('Fold results:')
     print('ACC:', acc_folds.round(6))
@@ -144,8 +150,13 @@ if __name__ == '__main__':
     df_test['label'] = test_preds
     df_test['path'] = df_test['path'].str.split('/').str[-1]
     df_test = df_test.rename(columns={'path': 'Id', 'label': 'Category'})
+    if len(args.ignore) > 0:
+        ignore = '_ignore' + '-'.join([str(x) for x in args.ignore])
+    else: 
+        ignore = ''
+    assert len(df_test) == 300
     df_test.to_csv(
-        os.path.join(OUTPUT, args.dir, 'submission.csv'), 
+        os.path.join(OUTPUT, args.dir, f'submission{ignore}.csv'), 
         index=False
     )
  
