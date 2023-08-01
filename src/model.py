@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 from torchvision import models
+import numpy as np
 
 
 # class VGG11(nn.Module):
@@ -46,16 +47,23 @@ from torchvision import models
 #         return self.model(x)
 
 
-class ResNet18(nn.Module):
-    def __init__(self, bands, in_channels=3):
-        super(ResNet18, self).__init__()
+class ResNet(nn.Module):
+    def __init__(self, bands: np.array, backbone: str, in_channels: int = 3):
+        super(ResNet, self).__init__()
 
-        self.model = models.resnet18()
+        if backbone == 'resnet18':
+            self.model = models.resnet18()
+            # original definition of the first layer on the resnet class
+            # self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        elif backbone == 'resnet34':
+            self.model = models.resnet34()
+        elif backbone == 'resnet50':
+            self.model = models.resnet50()
+        else:
+            raise Exception(f'Backbone {backbone} was not implemented.')
 
-        # original definition of the first layer on the resnet class
-        # self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
 
-        self.conv0 = nn.Conv2d(bands, in_channels, 1)
+        self.conv0 = nn.Conv2d(len(bands), in_channels, 1)
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, 3)  # output 3 classes
 
@@ -84,7 +92,7 @@ class HuEtAl(nn.Module):
 
     def _get_final_flattened_size(self):
         with torch.no_grad():
-            x = torch.zeros(1, 1, self.input_channels * self.h * self.w)
+            x = torch.zeros(1, 1, len(self.input_channels) * self.h * self.w)
             x = self.conv1(x)
             x = self.pool1(x)
             x = self.conv2(x)
@@ -95,7 +103,7 @@ class HuEtAl(nn.Module):
         super(HuEtAl, self).__init__()
         if kernel_size is None:
             # [In our experiments, k1 is better to be [ceil](n1/9)]
-            kernel_size = math.ceil(input_channels / 9)
+            kernel_size = math.ceil(len(input_channels) / 9)
         if pool_size is None:
             # The authors recommand that k2's value is chosen so that the pooled features have 30~40 values
             # ceil(kernel_size/5) gives the same values as in the paper so let's assume it's okay

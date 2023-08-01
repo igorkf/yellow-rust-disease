@@ -11,7 +11,7 @@ from sklearn.model_selection import StratifiedKFold
 from preprocessing import make_df
 from utils import set_seed
 from dataset import TIFDataset
-from model import ResNet18, HuEtAl
+from model import ResNet, HuEtAl
 from metrics import accuracy
 
 
@@ -35,17 +35,20 @@ def extract_best_models(dir):
 parser = argparse.ArgumentParser()
 parser.add_argument('--dir')
 parser.add_argument('--ignore', type=int, nargs='*', default=[])
+parser.add_argument('--b0', type=int, default=0)
+parser.add_argument('--b1', type=int, default=125)
+parser.add_argument('--s', type=int, default=64)
 args = parser.parse_args()
 
 PATH = 'data'
 OUTPUT = 'output/models'
 LABEL2INT = {'Health': 0, 'Other': 1, 'Rust': 2}
 INT2LABEL = {0: 'Health', 1: 'Other', 2: 'Rust'}
-BANDS = 125
+BANDS = np.arange(args.b0, args.b1)
 # RANDOM_BANDS = BANDS // 2
 N_FOLDS = 5
 RANDOM_SEED = 42
-IMG_SIZE = (64, 64)
+IMG_SIZE = (args.s, args.s)
 
 
 if __name__ == '__main__':
@@ -65,7 +68,7 @@ if __name__ == '__main__':
     if device == 'cpu':
         NUM_WORKERS = 1
     else:
-        NUM_WORKERS = 4
+        NUM_WORKERS = 8
     print('Device:', device)
     print('Num workers:', NUM_WORKERS)
 
@@ -78,6 +81,8 @@ if __name__ == '__main__':
     test_dataloader = DataLoader(test_ds, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, shuffle=False) 
 
     test_probs = np.zeros((len(df_test), 3))
+    oof_probs = []
+    oof_trues = []
     acc_folds = []
     accs = []
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_SEED)
@@ -98,8 +103,8 @@ if __name__ == '__main__':
         # define model
         if MODEL == 'hu':
             model = HuEtAl(img_size=IMG_SIZE, input_channels=BANDS, n_classes=len(LABEL2INT))
-        elif MODEL == 'resnet18':
-            model = ResNet18(BANDS)
+        elif MODEL in ['resnet18', 'resnet34', 'resnet50']:
+            model = ResNet(bands=BANDS, backbone=MODEL)
         else:
             raise Exception(f'Model {MODEL} not implemented.')
 
@@ -111,13 +116,22 @@ if __name__ == '__main__':
 
         # predict on val
         total_acc = 0.0
+        probs_val = []
+        trues_val = []
         with torch.no_grad():
             for idx, batch in enumerate(val_dataloader):
                 x = batch[0].to(device).float()
                 ytrue = batch[1].to(device)
+                trues_val.append(ytrue.detach().cpu().numpy())
                 ypred = model(x)
+                p = nn.functional.softmax(ypred, dim=1).detach().cpu().numpy()
+                probs_val.append(p)
                 acc = accuracy(ypred, ytrue)
                 total_acc += acc
+        trues_val = np.concatenate(trues_val)
+        oof_trues.append(trues_val)
+        probs_val = np.concatenate(probs_val)
+        oof_probs.append(probs_val)
         avg_acc = total_acc / (idx + 1)
         print(f'[VAL] Acc: {avg_acc:.6f}')
         acc_folds.append(avg_acc)
@@ -128,11 +142,21 @@ if __name__ == '__main__':
             for idx, batch in enumerate(test_dataloader):
                 x = batch[0].to(device).float()
                 ypred = model(x)
-                p = nn.functional.softmax(ypred, dim=1).cpu().numpy()
+                p = nn.functional.softmax(ypred, dim=1).detach().cpu().numpy()
                 probs.append(p)
         probs = np.concatenate(probs)
         test_probs += probs / len(MODELS)  # blend
+
+    # concatenate oofs
+    oof_trues = np.concatenate(oof_trues)
+    oof_probs = np.concatenate(oof_probs)
+
+    # save actual and probs
+    np.save(os.path.join(OUTPUT, args.dir, 'oof_trues.npy'), oof_trues)
+    np.save(os.path.join(OUTPUT, args.dir, 'oof_probs.npy'), oof_probs)
+    np.save(os.path.join(OUTPUT, args.dir, 'test_probs.npy'), test_probs)
     
+    # show results
     acc_folds = np.array(acc_folds)
     print('-' * 30)
     print('Fold results:')
@@ -159,4 +183,3 @@ if __name__ == '__main__':
         os.path.join(OUTPUT, args.dir, f'submission{ignore}.csv'), 
         index=False
     )
- 

@@ -4,7 +4,7 @@
 #SBATCH --output=logs/train_nn%j.log
 #SBATCH --partition gpu06
 #SBATCH --nodes=1
-#SBATCH --tasks-per-node=4
+#SBATCH --tasks-per-node=8
 #SBATCH --time=06:00:00
 
 ## configs 
@@ -16,10 +16,11 @@ conda deactivate
 conda activate crop-disease
 
 ## run
-for bs in 24 40 48 56 64 72
+for bs in 50 52 54 56 58 60
 do
     echo "---------------------------------"
-    python3 -u src/train_nn.py --bs=${bs}
     echo "bs=${bs}"
+    python3 -u src/train_nn.py --m=resnet18 --bs=${bs}
     echo " "
 done
+

@@ -14,13 +14,16 @@ import numpy as np
 from utils import set_seed
 from preprocessing import make_df
 from dataset import TIFDataset
-from model import ResNet18, HuEtAl
+from model import ResNet, HuEtAl
 from training import train_one_epoch, validate_one_epoch
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model')
-parser.add_argument('--bs')
+parser.add_argument('--m', required=True)
+parser.add_argument('--bs', type=int, required=True)
+parser.add_argument('--b0', type=int, default=0)
+parser.add_argument('--b1', type=int, default=125)
+parser.add_argument('--s', type=int, default=64)
 args = parser.parse_args()
 args.bs = int(args.bs)
 
@@ -28,11 +31,10 @@ PATH = 'data'
 OUTPUT = 'output/models'
 LABEL2INT = {'Health': 0, 'Other': 1, 'Rust': 2}
 INT2LABEL = {0: 'Health', 1: 'Other', 2: 'Rust'}
-BANDS = 125
-# RANDOM_BANDS = BANDS // 2
+BANDS = np.arange(args.b0, args.b1)
 N_FOLDS = 5
 RANDOM_SEED = 42
-IMG_SIZE = (64, 64)
+IMG_SIZE = (args.s, args.s)
 EPOCHS = 100
 
 # MODEL = 'convnext_large'
@@ -68,8 +70,8 @@ class EarlyStopper:
 
 if __name__ == '__main__':
     
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    OUT = f'output/models/{timestamp}_{args.model}_bs{args.bs}'
+    t = datetime.now().strftime('%Y%m%d-%H%M%S')
+    OUT = f'output/models/{t}_{args.m}_bs{args.bs}_b0{args.b0}_b1{args.b1}_s{args.s}'
     os.mkdir(OUT)
 
     set_seed(RANDOM_SEED)
@@ -82,7 +84,7 @@ if __name__ == '__main__':
     if device == 'cpu':
         NUM_WORKERS = 1
     else:
-        NUM_WORKERS = 4
+        NUM_WORKERS = 8
     print('Device:', device)
     print('Num workers:', NUM_WORKERS)
 
@@ -98,11 +100,12 @@ if __name__ == '__main__':
         loss_fn = torch.nn.CrossEntropyLoss()
 
         # define model
-        if args.model == 'hu':
+        if args.m == 'hu':
             transform = transforms.Compose([
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.RandomVerticalFlip(p=0.5),
                 transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
+                # transforms.Resize(args.s, antialias=True)
                 # transforms.Lambda(lambda img: channel_shuffle(img, p=0.5))
             ])
             model = HuEtAl(img_size=IMG_SIZE, input_channels=BANDS, n_classes=len(LABEL2INT))
@@ -110,13 +113,14 @@ if __name__ == '__main__':
             scheduler = EarlyStopper(patience=int(EPOCHS * 0.20), min_delta=0.01)
             # scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0, verbose=True)
             # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=20, verbose=True)
-        elif args.model == 'resnet18':
+        elif args.m in ['resnet18', 'resnet34', 'resnet50']:
             transform = transforms.Compose([
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.RandomVerticalFlip(p=0.5),
-                transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5))
+                transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
+                # transforms.Resize(args.s, antialias=True)
             ])
-            model = ResNet18(BANDS)
+            model = ResNet(bands=BANDS, backbone=args.m)
 
             # freeze high level features' layers: https://datascience.stackexchange.com/a/77587/97330
             model.model.layer3.requires_grad_(False)
@@ -127,7 +131,7 @@ if __name__ == '__main__':
             # scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0, verbose=True)
             scheduler = EarlyStopper(patience=int(EPOCHS * 0.20), min_delta=0.01)
         else:
-            raise Exception(f'Model {args.model} not implemented')
+            raise Exception(f'Model {args.m} not implemented')
         
         model = model.to(device)
 
@@ -185,4 +189,3 @@ if __name__ == '__main__':
    
     mean_acc = str(mean_acc).replace('.', '_') 
     os.rename(OUT, f'{OUT}_acc{mean_acc}')
-

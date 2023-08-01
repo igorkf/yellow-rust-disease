@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 from skimage.io import imread
 from skimage.util import img_as_float
+import numpy as np
 
 
 def normalize_between_channels(img):
@@ -14,7 +15,7 @@ def normalize_between_channels(img):
 
 
 class TIFDataset(Dataset):
-    def __init__(self, df, bands, transform=None):
+    def __init__(self, df, bands: np.array, transform=None):
         self.df = df
         self.bands = bands
         self.transform = transform
@@ -27,7 +28,7 @@ class TIFDataset(Dataset):
         label = torch.tensor(label)
 
         path = self.df.iloc[idx]['path']
-        img = img_as_float(imread(path))[:, :, :self.bands]  # some images have 126 bands idk why
+        img = img_as_float(imread(path))[:, :, self.bands]
         img = ToTensor()(img)
         # img = torch.tensor(img)
         # img = normalize_between_channels(img)
