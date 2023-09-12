@@ -56,9 +56,10 @@ Stratified KFold with `k=5`
 
 
 ## Resources
+- CentOS 7
 - GPU: Tesla V100 with 32GB (only used around 2GB)
 - Training: ~40 minutes
-- Predict: ~3 minutes
+- Inference: ~3 minutes
 
 
 <br>
