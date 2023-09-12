@@ -35,7 +35,6 @@ IMG_SIZE = (64, 64)
 EPOCHS = 100
 
 MODEL = 'resnet18'
-# MODEL = 'convnext_large'
 
 
 def channel_shuffle(img: torch.tensor, p):
@@ -117,13 +116,11 @@ if __name__ == '__main__':
             ])
             model = ResNet18(BANDS)
 
-            # freeze high level features' layers: https://datascience.stackexchange.com/a/77587/97330
+            # freeze high level features' layers
             model.model.layer3.requires_grad_(False)
             model.model.layer4.requires_grad_(False)
 
-            # optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
             optimizer = torch.optim.Adam(model.parameters(), lr=0.001)        
-            # scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0, verbose=True)
             scheduler = EarlyStopper(patience=int(EPOCHS * 0.20), min_delta=0.01)
         else:
             raise Exception(f'Model {MODEL} not implemented')
@@ -137,10 +134,6 @@ if __name__ == '__main__':
         df_val = df.loc[val]
         val_ds = TIFDataset(df_val, bands=BANDS, transform=None)
         val_dataloader = DataLoader(val_ds, batch_size=args.bs, num_workers=NUM_WORKERS, shuffle=False)
-
-        # https://www.kaggle.com/code/isbhargav/guide-to-pytorch-learning-rate-scheduling
-        # scheduler = lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1, verbose=True)
-        # scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=10, eta_min=0, verbose=True)
 
         best_acc = 0.0
         for epoch in range(EPOCHS):
@@ -170,13 +163,6 @@ if __name__ == '__main__':
                 print('Early stopping...')   
                 break
 
-            # print learnable band weights
-            # for name, param in model.named_parameters():
-            #     if name == 'W':
-            #         w = param.data.cpu().numpy()
-            #         print('Learnable band weights:')
-            #         print(pd.DataFrame(w).describe().round(4).T)
-
         acc_folds[fold] = best_acc
 
     mean_acc = acc_folds.mean().round(6) 
@@ -188,4 +174,3 @@ if __name__ == '__main__':
    
     mean_acc = str(mean_acc).replace('.', '_') 
     os.rename(OUT, f'{OUT}_acc{mean_acc}')
-

@@ -3,3 +3,5 @@ data/
 logs/
 output/
 *.pyc
+*.slurm
+README_cluster.md
