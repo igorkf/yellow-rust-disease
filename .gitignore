@@ -1,7 +1,8 @@
 .vscode/
-data/
-logs/
-output/
 *.pyc
 *.slurm
+*.csv
+*.log
+*.tif
+output/models/*/
 README_cluster.md
