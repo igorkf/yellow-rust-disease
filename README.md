@@ -63,9 +63,6 @@ Stratified KFold with `k=5`
 
 <br>
 
-****
-
-<br>
 
 ## Didn't work...oops
 - Randomly choose a subset of bands (0 to 60 or 65 to 125, for example)
